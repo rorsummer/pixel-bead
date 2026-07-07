@@ -43,6 +43,11 @@ export interface PixelateResult {
   blocks: BlockInfo[];
 }
 
+// 后端地址：
+// - 开发环境（npm run dev）：VITE_API_BASE 未定义，走 Vite 代理，值为空串 -> 请求 "/api/..."
+// - 生产环境（Vercel）：VITE_API_BASE 设置为 Render 地址 -> 请求 "https://xxx/api/..."
+const API_BASE = import.meta.env.VITE_API_BASE || "";
+
 export async function pixelateImage(p: PixelateParams): Promise<PixelateResult> {
   const form = new FormData();
   form.append("file", p.file);
@@ -56,10 +61,23 @@ export async function pixelateImage(p: PixelateParams): Promise<PixelateResult> 
   form.append("chart_cell", String(p.chartCell));
   form.append("block_cells", String(p.blockCells));
 
-  const res = await fetch("/api/pixelate", { method: "POST", body: form });
+  const res = await fetch(`${API_BASE}/api/pixelate`, {
+    method: "POST",
+    body: form,
+  });
   if (!res.ok) {
     const t = await res.text();
     throw new Error(`请求失败 ${res.status}：${t}`);
   }
   return res.json();
+}
+
+// 唤醒后端（用来在页面加载时预热免费套餐的冷启动）
+export async function warmupBackend(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/`, { method: "GET" });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }

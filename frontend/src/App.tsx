@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Uploader from "./components/Uploader";
 import ParamsPanel, { type ParamsState } from "./components/ParamsPanel";
 import StatsTable from "./components/StatsTable";
 import BlocksView from "./components/BlocksView";
-import { pixelateImage, type PixelateResult } from "./api/pixelate";
+import { pixelateImage, warmupBackend, type PixelateResult } from "./api/pixelate";
 import "./App.css";
 
 const DEFAULT_PARAMS: ParamsState = {
@@ -23,9 +23,17 @@ export default function App() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [params, setParams] = useState<ParamsState>(DEFAULT_PARAMS);
   const [loading, setLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState("正在处理，请稍候...");
   const [result, setResult] = useState<PixelateResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("preview");
+  const [backendReady, setBackendReady] = useState(false);
+  const timerRef = useRef<number | null>(null);
+
+  // 页面打开就悄悄唤醒后端，减少用户点击时的等待
+  useEffect(() => {
+    warmupBackend().then(setBackendReady);
+  }, []);
 
   useEffect(() => {
     if (!file) { setPreviewUrl(null); return; }
@@ -38,6 +46,13 @@ export default function App() {
     if (!file) return;
     setLoading(true);
     setError(null);
+    setLoadingMsg(backendReady ? "正在处理，请稍候..." : "服务器正在唤醒，首次访问约 30-60 秒...");
+
+    // 长时间未完成时更换提示文案，让用户不焦虑
+    timerRef.current = window.setTimeout(() => {
+      setLoadingMsg("图片较大或服务器较慢，请再等等...");
+    }, 15000);
+
     try {
       const res = await pixelateImage({
         file,
@@ -53,9 +68,11 @@ export default function App() {
       });
       setResult(res);
       setTab("preview");
+      setBackendReady(true);
     } catch (e: any) {
       setError(e.message || "处理失败");
     } finally {
+      if (timerRef.current) window.clearTimeout(timerRef.current);
       setLoading(false);
     }
   };
@@ -106,7 +123,7 @@ export default function App() {
           {loading && (
             <div className="placeholder">
               <div className="spinner" />
-              <div>正在处理，请稍候...</div>
+              <div>{loadingMsg}</div>
             </div>
           )}
           {result && (
@@ -174,7 +191,7 @@ export default function App() {
       </main>
 
       <footer className="app-footer">
-        <span>MARD 221 色卡 · 本地运行 · 图片不会上传服务器</span>
+        <span>MARD 221 色卡 · 使用免费服务，首次访问需短暂等待</span>
       </footer>
     </div>
   );
