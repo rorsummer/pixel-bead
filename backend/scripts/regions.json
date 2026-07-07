@@ -1,0 +1,11 @@
+[
+  { "code_prefix": "A", "total": 26, "max_per_row": 16, "box": [316, 202, 1196, 344] },
+  { "code_prefix": "B", "total": 32, "max_per_row": 16, "box": [316, 345, 1196, 487] },
+  { "code_prefix": "C", "total": 29, "max_per_row": 16, "box": [316, 488, 1196, 630] },
+  { "code_prefix": "D", "total": 26, "max_per_row": 16, "box": [316, 631, 1196, 773] },
+  { "code_prefix": "E", "total": 24, "max_per_row": 16, "box": [316, 774, 1196, 916] },
+  { "code_prefix": "F", "total": 25, "max_per_row": 16, "box": [316, 917, 1196, 1059] },
+  { "code_prefix": "G", "total": 21, "max_per_row": 16, "box": [316, 1060, 1196, 1202] },
+  { "code_prefix": "H", "total": 23, "max_per_row": 16, "box": [316, 1203, 1196, 1341] },
+  { "code_prefix": "M", "total": 15, "max_per_row": 16, "box": [316, 1342, 1140, 1390] }
+]

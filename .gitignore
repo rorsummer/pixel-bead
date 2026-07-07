@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+build/
+.vite/
+
+# 环境变量和密钥
+.env
+.env.local
+*.pem
+
+# 编辑器/系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 项目产出物（避免推测试图片和临时文件）
+backend/scripts/*_preview.png
+backend/scripts/*_chart.png
+backend/scripts/*_stats.txt
+backend/scripts/inspect_preview.png
+backend/scripts/test1*
+backend/scripts/test2*
+
+# 保留色卡原图和 mard_palette.json（这些是项目必需的）
+!backend/scripts/mard_chart.png
+!backend/app/data/mard_palette.json
