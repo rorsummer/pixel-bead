@@ -1,4 +1,4 @@
-"""像素化 API 接口（v2）"""
+"""像素化 API 接口（v3）"""
 import base64
 import io
 
@@ -26,6 +26,24 @@ def _img_to_b64(img: Image.Image) -> str:
     return base64.b64encode(buf.getvalue()).decode("ascii")
 
 
+def _extract_grid_data(result):
+    """从结果里提取每格色号（背景=None），生成二维数组"""
+    indices = result["indices"]
+    bg_mask = result["bg_mask"]
+    palette = result["palette"]
+    gh, gw = indices.shape
+    grid = []
+    for y in range(gh):
+        row = []
+        for x in range(gw):
+            if bg_mask[y, x]:
+                row.append(None)
+            else:
+                row.append(palette[int(indices[y, x])]["code"])
+        grid.append(row)
+    return grid
+
+
 @router.get("/palette")
 def get_palette():
     return {"count": len(_PALETTE), "colors": _PALETTE}
@@ -42,7 +60,7 @@ async def pixelate_image(
     dither: bool = Form(False),
     preview_cell: int = Form(16, ge=1, le=40),
     chart_cell: int = Form(40, ge=8, le=80),
-    block_cells: int = Form(0, ge=0, le=100, description="0 表示不分块"),
+    block_cells: int = Form(0, ge=0, le=100),
 ):
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(400, "只接受图片文件")
@@ -68,6 +86,7 @@ async def pixelate_image(
     chart_img = render_chart(result, cell_size=chart_cell, axis=True)
     chart_svg = render_chart_svg(result, cell_size=chart_cell, axis=True)
     stats = compute_stats(result)
+    grid_data = _extract_grid_data(result)
 
     blocks_out = []
     if block_cells > 0:
@@ -97,6 +116,7 @@ async def pixelate_image(
         "total_beads": sum(s["count"] for s in stats),
         "color_count": len(stats),
         "stats": stats,
+        "grid_data": grid_data,
         "preview_png_base64": _img_to_b64(preview_img),
         "chart_png_base64": _img_to_b64(chart_img),
         "chart_svg": chart_svg,

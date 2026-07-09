@@ -8,8 +8,10 @@ export default function Create() {
   }
 
   const handleDrawChart = () => {
-    Taro.showToast({ title: '绘制图纸功能开发中', icon: 'none' })
-  }
+  Taro.navigateTo({ url: '/pages/draw-chart/index' })
+}
+
+
 
   return (
     <View className='page'>
