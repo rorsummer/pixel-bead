@@ -7,6 +7,7 @@ export default defineAppConfig({
     'pages/mine/index',
     'pages/image-to-chart/index',
     'pages/draw-chart/index',
+    'pages/work-detail/index',
   ],
   window: {
     backgroundTextStyle: 'light',
