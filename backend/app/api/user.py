@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
+from app.core.quota import get_pixelate_quota
 from app.database import get_db
 from app.models import User
 
@@ -17,7 +18,6 @@ class UpdateProfileRequest(BaseModel):
 
 @router.get("/me")
 def get_me(user: User = Depends(get_current_user)):
-    """获取当前登录用户信息"""
     return {
         "id": user.id,
         "nickname": user.nickname,
@@ -32,7 +32,6 @@ def update_profile(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """更新用户昵称/头像"""
     if req.nickname is not None:
         user.nickname = req.nickname
     if req.avatar_url is not None:
@@ -45,3 +44,12 @@ def update_profile(
         "avatar_url": user.avatar_url,
         "coins": user.coins,
     }
+
+
+@router.get("/quota/pixelate")
+def get_quota_pixelate(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """查询图片转图纸的今日配额"""
+    return get_pixelate_quota(db, user)

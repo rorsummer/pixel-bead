@@ -20,7 +20,8 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="创豆纪 API",
     description="拼豆图纸生成器后端",
-    version="0.5.0",
+    version="0.7.0",
+
 )
 
 app.add_middleware(

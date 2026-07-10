@@ -1,11 +1,12 @@
-"""像素化 API 接口（v3）"""
+"""像素化 API 接口"""
 import base64
 import io
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
-from PIL import Image
+from sqlalchemy.orm import Session
 
+from app.auth import get_current_user
 from app.core.palette import load_palette
 from app.core.pixelator import (
     pixelate,
@@ -15,19 +16,21 @@ from app.core.pixelator import (
     split_into_blocks,
     compute_stats,
 )
+from app.core.quota import consume_pixelate
+from app.database import get_db
+from app.models import User
 
 router = APIRouter()
 _PALETTE = load_palette()
 
 
-def _img_to_b64(img: Image.Image) -> str:
+def _img_to_b64(img):
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return base64.b64encode(buf.getvalue()).decode("ascii")
 
 
 def _extract_grid_data(result):
-    """从结果里提取每格色号（背景=None），生成二维数组"""
     indices = result["indices"]
     bg_mask = result["bg_mask"]
     palette = result["palette"]
@@ -61,9 +64,14 @@ async def pixelate_image(
     preview_cell: int = Form(16, ge=1, le=40),
     chart_cell: int = Form(40, ge=8, le=80),
     block_cells: int = Form(0, ge=0, le=100),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(400, "只接受图片文件")
+
+    # 消费配额（免费或扣金币）
+    consumption = consume_pixelate(db, user)
 
     data = await file.read()
     tmp = io.BytesIO(data)
@@ -124,4 +132,5 @@ async def pixelate_image(
         "block_rows": max(1, (result["grid_height"] + block_cells - 1) // block_cells) if block_cells > 0 else 0,
         "block_cols": max(1, (result["grid_width"] + block_cells - 1) // block_cells) if block_cells > 0 else 0,
         "blocks": blocks_out,
+        "consumption": consumption,
     })

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { View, Text, Image, Button, Input } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { fetchMe, updateProfile, wechatLogin } from '../../services/request'
@@ -12,9 +12,7 @@ export default function Mine() {
   const [nickname, setNickname] = useState('')
 
   useDidShow(() => {
-    // 每次进入页面从缓存读，登录后也会立刻反映
     setUser(getUser())
-    // 已登录的话顺便拉最新数据
     if (isLoggedIn()) {
       fetchMe().then(setUser).catch(() => {})
     }
@@ -23,11 +21,7 @@ export default function Mine() {
   const handleLogin = async () => {
     setLoading(true)
     try {
-      // 获取微信用户头像和昵称（新版微信推荐做法）
-      const profile = await Taro.getUserProfile({
-        desc: '用于完善用户资料',
-      }).catch(() => null)
-
+      const profile = await Taro.getUserProfile({ desc: '用于完善用户资料' }).catch(() => null)
       const u = await wechatLogin({
         nickname: profile?.userInfo.nickName,
         avatar_url: profile?.userInfo.avatarUrl,
@@ -75,7 +69,26 @@ export default function Mine() {
     }
   }
 
-  // 未登录界面
+  const goList = (kind: 'mine' | 'likes' | 'favorites') => {
+    if (!isLoggedIn()) {
+      Taro.showToast({ title: '请先登录', icon: 'none' })
+      return
+    }
+    Taro.navigateTo({ url: `/pages/work-list/index?kind=${kind}` })
+  }
+
+  const goFeedback = () => {
+    if (!isLoggedIn()) {
+      Taro.showToast({ title: '请先登录', icon: 'none' })
+      return
+    }
+    Taro.navigateTo({ url: '/pages/feedback/index' })
+  }
+
+  const showComingSoon = () => {
+    Taro.showToast({ title: '功能开发中', icon: 'none' })
+  }
+
   if (!user) {
     return (
       <View className='page'>
@@ -86,12 +99,7 @@ export default function Mine() {
           <View className='login-avatar'>👤</View>
           <Text className='login-title'>登录后享受完整功能</Text>
           <Text className='login-desc'>发布作品、点赞收藏、赚取金币</Text>
-          <Button
-            className='login-btn'
-            type='primary'
-            loading={loading}
-            onClick={handleLogin}
-          >
+          <Button className='login-btn' type='primary' loading={loading} onClick={handleLogin}>
             微信一键登录
           </Button>
         </View>
@@ -99,7 +107,6 @@ export default function Mine() {
     )
   }
 
-  // 已登录界面
   return (
     <View className='page'>
       <View className='user-header'>
@@ -118,15 +125,8 @@ export default function Mine() {
                 maxlength={20}
                 focus
               />
-              <Text className='edit-name-btn' onClick={saveNickname}>
-                保存
-              </Text>
-              <Text
-                className='edit-name-btn cancel'
-                onClick={() => setEditingName(false)}
-              >
-                取消
-              </Text>
+              <Text className='edit-name-btn' onClick={saveNickname}>保存</Text>
+              <Text className='edit-name-btn cancel' onClick={() => setEditingName(false)}>取消</Text>
             </View>
           ) : (
             <View className='name-row' onClick={startEditNickname}>
@@ -143,27 +143,27 @@ export default function Mine() {
       </View>
 
       <View className='menu-section'>
-        <View className='menu-item'>
+        <View className='menu-item' onClick={showComingSoon}>
           <Text className='menu-icon'>📅</Text>
           <Text className='menu-text'>每日签到</Text>
           <Text className='menu-arrow'>›</Text>
         </View>
-        <View className='menu-item'>
+        <View className='menu-item' onClick={showComingSoon}>
           <Text className='menu-icon'>🎯</Text>
           <Text className='menu-text'>每日任务</Text>
           <Text className='menu-arrow'>›</Text>
         </View>
-        <View className='menu-item'>
+        <View className='menu-item' onClick={() => goList('mine')}>
           <Text className='menu-icon'>🎨</Text>
           <Text className='menu-text'>我的作品</Text>
           <Text className='menu-arrow'>›</Text>
         </View>
-        <View className='menu-item'>
+        <View className='menu-item' onClick={() => goList('likes')}>
           <Text className='menu-icon'>❤️</Text>
           <Text className='menu-text'>我点赞的</Text>
           <Text className='menu-arrow'>›</Text>
         </View>
-        <View className='menu-item'>
+        <View className='menu-item' onClick={() => goList('favorites')}>
           <Text className='menu-icon'>⭐</Text>
           <Text className='menu-text'>我收藏的</Text>
           <Text className='menu-arrow'>›</Text>
@@ -171,7 +171,7 @@ export default function Mine() {
       </View>
 
       <View className='menu-section'>
-        <View className='menu-item'>
+        <View className='menu-item' onClick={goFeedback}>
           <Text className='menu-icon'>💬</Text>
           <Text className='menu-text'>意见反馈</Text>
           <Text className='menu-arrow'>›</Text>

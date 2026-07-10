@@ -8,6 +8,8 @@ export default defineAppConfig({
     'pages/image-to-chart/index',
     'pages/draw-chart/index',
     'pages/work-detail/index',
+    'pages/work-list/index',
+    'pages/feedback/index',
   ],
   window: {
     backgroundTextStyle: 'light',

@@ -2,7 +2,7 @@
 from datetime import datetime
 
 from sqlalchemy import (
-    BigInteger, Boolean, Column, DateTime, ForeignKey, Integer, String, Text,
+    BigInteger, Boolean, Column, DateTime, Date, ForeignKey, Integer, String, Text,
     UniqueConstraint,
 )
 
@@ -46,41 +46,65 @@ class Work(Base):
 
 
 class Like(Base):
-    """点赞记录"""
     __tablename__ = "likes"
-
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     work_id = Column(Integer, ForeignKey("works.id"), nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-
-    __table_args__ = (
-        UniqueConstraint("user_id", "work_id", name="uq_like_user_work"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "work_id", name="uq_like_user_work"),)
 
 
 class Favorite(Base):
-    """收藏记录"""
     __tablename__ = "favorites"
-
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     work_id = Column(Integer, ForeignKey("works.id"), nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    __table_args__ = (UniqueConstraint("user_id", "work_id", name="uq_fav_user_work"),)
 
-    __table_args__ = (
-        UniqueConstraint("user_id", "work_id", name="uq_fav_user_work"),
-    )
 
-    
 class Feedback(Base):
-    """用户反馈"""
     __tablename__ = "feedbacks"
-
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     content = Column(Text, nullable=False)
-    contact = Column(String(128), nullable=True)  # 联系方式（选填）
-    status = Column(String(16), default="open", nullable=False)  # open / done
+    contact = Column(String(128), nullable=True)
+    status = Column(String(16), default="open", nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
 
+
+class CoinTransaction(Base):
+    __tablename__ = "coin_transactions"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    kind = Column(String(32), nullable=False)
+    amount = Column(Integer, nullable=False)
+    balance = Column(BigInteger, nullable=False)
+    ref_id = Column(Integer, nullable=True)
+    remark = Column(String(200), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
+class DailySignin(Base):
+    __tablename__ = "daily_signins"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    signin_date = Column(Date, nullable=False, index=True)
+    coins_gained = Column(Integer, nullable=False)
+    streak = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    __table_args__ = (UniqueConstraint("user_id", "signin_date", name="uq_signin_user_date"),)
+
+
+class DailyUsage(Base):
+    """每日使用次数记录，用于配额（比如图片转图纸每日 5 次免费）"""
+    __tablename__ = "daily_usages"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    action = Column(String(32), nullable=False)  # 'pixelate' 等
+    usage_date = Column(Date, nullable=False, index=True)
+    count = Column(Integer, default=0, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    __table_args__ = (
+        UniqueConstraint("user_id", "action", "usage_date", name="uq_usage_user_action_date"),
+    )
