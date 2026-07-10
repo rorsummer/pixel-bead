@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user, get_current_user_optional
 from app.database import get_db
 from app.models import Favorite, Like, User, Work
+from app.wechat import check_text_safe
 
 router = APIRouter()
 
@@ -78,7 +79,7 @@ def _fetch_authors(db: Session, works: list) -> dict:
 
 
 @router.post("/publish")
-def publish_work(
+async def publish_work(
     req: PublishWorkRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -89,6 +90,11 @@ def publish_work(
         raise HTTPException(400, "grid_data 高度不一致")
     if req.grid_data and len(req.grid_data[0]) != req.grid_width:
         raise HTTPException(400, "grid_data 宽度不一致")
+
+    # 内容审核
+    ok, reason = await check_text_safe(req.title, user.openid, scene=1)
+    if not ok:
+        raise HTTPException(400, f"标题包含不合规内容，请修改")
 
     total_beads = sum(s.count for s in req.stats)
     color_count = len(req.stats)
@@ -121,7 +127,6 @@ def list_works(
     db: Session = Depends(get_db),
 ):
     q = db.query(Work).filter(Work.is_deleted == False)
-
     if price_type == "free":
         q = q.filter(Work.price == 0)
     elif price_type == "paid":
@@ -133,7 +138,7 @@ def list_works(
     elif sort == "likes":
         q = q.order_by(desc(Work.likes_count), desc(Work.created_at))
         works = q.offset((page - 1) * limit).limit(limit).all()
-    else:  # hot
+    else:
         q = q.order_by(desc(Work.created_at))
         candidates = q.offset((page - 1) * limit).limit(limit * 2).all()
         candidates.sort(
@@ -181,8 +186,6 @@ def get_work(
         raise HTTPException(404, "作品不存在")
 
     author = db.query(User).filter(User.id == work.user_id).first()
-
-    # 我是否点赞/收藏过
     my_liked = False
     my_favorited = False
     if user:
@@ -199,7 +202,6 @@ def get_work(
             is not None
         )
 
-    # 浏览量 +1（自己看自己的不加）
     if not user or user.id != work.user_id:
         work.views_count += 1
         db.commit()

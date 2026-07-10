@@ -1,8 +1,16 @@
 import { useState, useEffect } from 'react'
 import { View, Text, Image, ScrollView, Button } from '@tarojs/components'
 import Taro, { useRouter } from '@tarojs/taro'
-import { getWorkDetail, deleteWork, WorkDetail } from '../../services/works'
-import { getUser } from '../../services/store'
+import {
+  getWorkDetail,
+  deleteWork,
+  likeWork,
+  unlikeWork,
+  favoriteWork,
+  unfavoriteWork,
+  WorkDetail,
+} from '../../services/works'
+import { getUser, isLoggedIn } from '../../services/store'
 import './index.scss'
 
 export default function WorkDetailPage() {
@@ -10,6 +18,8 @@ export default function WorkDetailPage() {
   const workId = Number(router.params.id)
   const [work, setWork] = useState<WorkDetail | null>(null)
   const [loading, setLoading] = useState(true)
+  const [liking, setLiking] = useState(false)
+  const [faving, setFaving] = useState(false)
 
   useEffect(() => {
     if (!workId) {
@@ -18,11 +28,49 @@ export default function WorkDetailPage() {
     }
     getWorkDetail(workId)
       .then(setWork)
-      .catch((e) => {
-        Taro.showToast({ title: e.message || '加载失败', icon: 'none' })
-      })
+      .catch((e) => Taro.showToast({ title: e.message || '加载失败', icon: 'none' }))
       .finally(() => setLoading(false))
   }, [workId])
+
+  const requireLogin = () => {
+    if (isLoggedIn()) return true
+    Taro.showModal({
+      title: '需要登录',
+      content: '登录后才能互动哦',
+      confirmText: '去登录',
+      success: (r) => r.confirm && Taro.switchTab({ url: '/pages/mine/index' }),
+    })
+    return false
+  }
+
+  const toggleLike = async () => {
+    if (!work || liking) return
+    if (!requireLogin()) return
+    setLiking(true)
+    try {
+      const res = work.my_liked ? await unlikeWork(work.id) : await likeWork(work.id)
+      setWork({ ...work, my_liked: res.liked, likes_count: res.likes_count })
+    } catch (e: any) {
+      Taro.showToast({ title: e.message || '操作失败', icon: 'none' })
+    } finally {
+      setLiking(false)
+    }
+  }
+
+  const toggleFav = async () => {
+    if (!work || faving) return
+    if (!requireLogin()) return
+    setFaving(true)
+    try {
+      const res = work.my_favorited ? await unfavoriteWork(work.id) : await favoriteWork(work.id)
+      setWork({ ...work, my_favorited: res.favorited, favorites_count: res.favorites_count })
+      Taro.showToast({ title: res.favorited ? '已收藏' : '已取消收藏', icon: 'success' })
+    } catch (e: any) {
+      Taro.showToast({ title: e.message || '操作失败', icon: 'none' })
+    } finally {
+      setFaving(false)
+    }
+  }
 
   const saveCover = async () => {
     if (!work?.cover_base64) return
@@ -80,12 +128,8 @@ export default function WorkDetailPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }
 
-  if (loading) {
-    return <View className='page loading'>加载中...</View>
-  }
-  if (!work) {
-    return <View className='page loading'>作品不存在</View>
-  }
+  if (loading) return <View className='page loading'>加载中...</View>
+  if (!work) return <View className='page loading'>作品不存在</View>
 
   const me = getUser()
   const isMine = me && me.id === work.user_id
@@ -108,6 +152,30 @@ export default function WorkDetailPage() {
           )}
           <Text className='nickname'>{work.author?.nickname || '匿名'}</Text>
           <Text className='time'>{formatTime(work.created_at)}</Text>
+        </View>
+      </View>
+
+      <View className='interact-block'>
+        <View
+          className={`interact-btn ${work.my_liked ? 'active' : ''}`}
+          onClick={toggleLike}
+        >
+          <Text className='interact-icon'>{work.my_liked ? '❤️' : '🤍'}</Text>
+          <Text className='interact-label'>点赞</Text>
+          <Text className='interact-count'>{work.likes_count}</Text>
+        </View>
+        <View
+          className={`interact-btn ${work.my_favorited ? 'active-fav' : ''}`}
+          onClick={toggleFav}
+        >
+          <Text className='interact-icon'>{work.my_favorited ? '⭐' : '☆'}</Text>
+          <Text className='interact-label'>收藏</Text>
+          <Text className='interact-count'>{work.favorites_count}</Text>
+        </View>
+        <View className='interact-btn'>
+          <Text className='interact-icon'>👁</Text>
+          <Text className='interact-label'>浏览</Text>
+          <Text className='interact-count'>{work.views_count}</Text>
         </View>
       </View>
 

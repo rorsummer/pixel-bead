@@ -15,6 +15,8 @@ export interface WorkItem {
   favorites_count: number
   views_count: number
   created_at: string
+  my_liked?: boolean
+  my_favorited?: boolean
   author?: {
     id: number
     nickname: string
@@ -75,6 +77,72 @@ export async function deleteWork(id: number): Promise<void> {
   return request({
     url: `/api/works/${id}`,
     method: 'DELETE',
+    requireAuth: true,
+  })
+}
+
+/* ---- 点赞 / 收藏 ---- */
+
+export async function likeWork(id: number) {
+  return request<{ liked: boolean; likes_count: number }>({
+    url: `/api/works/${id}/like`,
+    method: 'POST',
+    requireAuth: true,
+  })
+}
+
+export async function unlikeWork(id: number) {
+  return request<{ liked: boolean; likes_count: number }>({
+    url: `/api/works/${id}/like`,
+    method: 'DELETE',
+    requireAuth: true,
+  })
+}
+
+export async function favoriteWork(id: number) {
+  return request<{ favorited: boolean; favorites_count: number }>({
+    url: `/api/works/${id}/favorite`,
+    method: 'POST',
+    requireAuth: true,
+  })
+}
+
+export async function unfavoriteWork(id: number) {
+  return request<{ favorited: boolean; favorites_count: number }>({
+    url: `/api/works/${id}/favorite`,
+    method: 'DELETE',
+    requireAuth: true,
+  })
+}
+
+/* ---- 我的三个列表 ---- */
+
+export async function listMyWorks(params: { page?: number; limit?: number } = {}): Promise<WorkListResponse> {
+  const q = new URLSearchParams()
+  q.set('page', String(params.page || 1))
+  q.set('limit', String(params.limit || 20))
+  return request({
+    url: `/api/works/mine?${q.toString()}`,
+    requireAuth: true,
+  })
+}
+
+export async function listMyLikes(params: { page?: number; limit?: number } = {}): Promise<WorkListResponse> {
+  const q = new URLSearchParams()
+  q.set('page', String(params.page || 1))
+  q.set('limit', String(params.limit || 20))
+  return request({
+    url: `/api/me/likes?${q.toString()}`,
+    requireAuth: true,
+  })
+}
+
+export async function listMyFavorites(params: { page?: number; limit?: number } = {}): Promise<WorkListResponse> {
+  const q = new URLSearchParams()
+  q.set('page', String(params.page || 1))
+  q.set('limit', String(params.limit || 20))
+  return request({
+    url: `/api/me/favorites?${q.toString()}`,
     requireAuth: true,
   })
 }

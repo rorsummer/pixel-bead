@@ -71,3 +71,16 @@ class Favorite(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "work_id", name="uq_fav_user_work"),
     )
+
+    
+class Feedback(Base):
+    """用户反馈"""
+    __tablename__ = "feedbacks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    content = Column(Text, nullable=False)
+    contact = Column(String(128), nullable=True)  # 联系方式（选填）
+    status = Column(String(16), default="open", nullable=False)  # open / done
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
