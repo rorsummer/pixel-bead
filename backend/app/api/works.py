@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user, get_current_user_optional
 from app.database import get_db
-from app.models import User, Work
+from app.models import Favorite, Like, User, Work
 
 router = APIRouter()
 
@@ -23,7 +23,7 @@ class StatItem(BaseModel):
 
 class PublishWorkRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=64)
-    source_type: str  # "image" | "draw"
+    source_type: str
     grid_width: int = Field(..., ge=1, le=200)
     grid_height: int = Field(..., ge=1, le=200)
     grid_data: list[list[Optional[str]]]
@@ -32,7 +32,13 @@ class PublishWorkRequest(BaseModel):
     price: int = Field(0, ge=0)
 
 
-def _work_to_dict(w: Work, author: Optional[User] = None, include_data: bool = False):
+def _work_to_dict(
+    w: Work,
+    author: Optional[User] = None,
+    include_data: bool = False,
+    my_liked: bool = False,
+    my_favorited: bool = False,
+):
     d = {
         "id": w.id,
         "user_id": w.user_id,
@@ -48,6 +54,8 @@ def _work_to_dict(w: Work, author: Optional[User] = None, include_data: bool = F
         "favorites_count": w.favorites_count,
         "views_count": w.views_count,
         "created_at": w.created_at.isoformat(),
+        "my_liked": my_liked,
+        "my_favorited": my_favorited,
     }
     if author:
         d["author"] = {
@@ -61,21 +69,26 @@ def _work_to_dict(w: Work, author: Optional[User] = None, include_data: bool = F
     return d
 
 
+def _fetch_authors(db: Session, works: list) -> dict:
+    user_ids = {w.user_id for w in works}
+    if not user_ids:
+        return {}
+    authors = db.query(User).filter(User.id.in_(user_ids)).all()
+    return {u.id: u for u in authors}
+
+
 @router.post("/publish")
 def publish_work(
     req: PublishWorkRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """发布作品"""
     if req.source_type not in ("image", "draw"):
         raise HTTPException(400, "无效的作品类型")
-
-    # 校验 grid_data 尺寸
     if len(req.grid_data) != req.grid_height:
-        raise HTTPException(400, "grid_data 高度与 grid_height 不一致")
+        raise HTTPException(400, "grid_data 高度不一致")
     if req.grid_data and len(req.grid_data[0]) != req.grid_width:
-        raise HTTPException(400, "grid_data 宽度与 grid_width 不一致")
+        raise HTTPException(400, "grid_data 宽度不一致")
 
     total_beads = sum(s.count for s in req.stats)
     color_count = len(req.stats)
@@ -107,7 +120,6 @@ def list_works(
     limit: int = Query(20, ge=1, le=50),
     db: Session = Depends(get_db),
 ):
-    """列表：支持排序和价格筛选"""
     q = db.query(Work).filter(Work.is_deleted == False)
 
     if price_type == "free":
@@ -117,40 +129,25 @@ def list_works(
 
     if sort == "newest":
         q = q.order_by(desc(Work.created_at))
+        works = q.offset((page - 1) * limit).limit(limit).all()
     elif sort == "likes":
         q = q.order_by(desc(Work.likes_count), desc(Work.created_at))
-    else:  # hot: 综合点赞、收藏、浏览
-        # 简易热度算法：点赞*3 + 收藏*5 + 浏览*1
-        # 用 Python 端排序更简单（不用 SQL 表达式）
+        works = q.offset((page - 1) * limit).limit(limit).all()
+    else:  # hot
         q = q.order_by(desc(Work.created_at))
-        works = q.offset((page - 1) * limit).limit(limit * 2).all()
-        works.sort(
+        candidates = q.offset((page - 1) * limit).limit(limit * 2).all()
+        candidates.sort(
             key=lambda w: w.likes_count * 3 + w.favorites_count * 5 + w.views_count,
             reverse=True,
         )
-        works = works[:limit]
-        author_map = _fetch_authors(db, works)
-        return {
-            "items": [_work_to_dict(w, author=author_map.get(w.user_id)) for w in works],
-            "page": page,
-            "has_more": len(works) == limit,
-        }
+        works = candidates[:limit]
 
-    works = q.offset((page - 1) * limit).limit(limit).all()
-    author_map = _fetch_authors(db, works)
+    authors = _fetch_authors(db, works)
     return {
-        "items": [_work_to_dict(w, author=author_map.get(w.user_id)) for w in works],
+        "items": [_work_to_dict(w, author=authors.get(w.user_id)) for w in works],
         "page": page,
         "has_more": len(works) == limit,
     }
-
-
-def _fetch_authors(db: Session, works: list) -> dict:
-    user_ids = {w.user_id for w in works}
-    if not user_ids:
-        return {}
-    authors = db.query(User).filter(User.id.in_(user_ids)).all()
-    return {u.id: u for u in authors}
 
 
 @router.get("/mine")
@@ -160,7 +157,6 @@ def list_my_works(
     limit: int = Query(20, ge=1, le=50),
     db: Session = Depends(get_db),
 ):
-    """我的作品"""
     q = (
         db.query(Work)
         .filter(Work.user_id == user.id, Work.is_deleted == False)
@@ -180,19 +176,42 @@ def get_work(
     user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
-    """详情"""
     work = db.query(Work).filter(Work.id == work_id, Work.is_deleted == False).first()
     if not work:
         raise HTTPException(404, "作品不存在")
 
     author = db.query(User).filter(User.id == work.user_id).first()
 
+    # 我是否点赞/收藏过
+    my_liked = False
+    my_favorited = False
+    if user:
+        my_liked = (
+            db.query(Like)
+            .filter(Like.user_id == user.id, Like.work_id == work.id)
+            .first()
+            is not None
+        )
+        my_favorited = (
+            db.query(Favorite)
+            .filter(Favorite.user_id == user.id, Favorite.work_id == work.id)
+            .first()
+            is not None
+        )
+
     # 浏览量 +1（自己看自己的不加）
     if not user or user.id != work.user_id:
         work.views_count += 1
         db.commit()
+        db.refresh(work)
 
-    return _work_to_dict(work, author=author, include_data=True)
+    return _work_to_dict(
+        work,
+        author=author,
+        include_data=True,
+        my_liked=my_liked,
+        my_favorited=my_favorited,
+    )
 
 
 @router.delete("/{work_id}")
@@ -201,7 +220,6 @@ def delete_work(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """删除自己的作品（软删除）"""
     work = db.query(Work).filter(Work.id == work_id).first()
     if not work:
         raise HTTPException(404, "作品不存在")
