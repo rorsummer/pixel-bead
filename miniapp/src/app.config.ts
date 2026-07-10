@@ -10,6 +10,8 @@ export default defineAppConfig({
     'pages/work-detail/index',
     'pages/work-list/index',
     'pages/feedback/index',
+    'pages/signin/index',
+    'pages/coins/index',
   ],
   window: {
     backgroundTextStyle: 'light',

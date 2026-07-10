@@ -69,19 +69,29 @@ export default function Mine() {
     }
   }
 
+  const requireLogin = (): boolean => {
+    if (isLoggedIn()) return true
+    Taro.showToast({ title: '请先登录', icon: 'none' })
+    return false
+  }
+
   const goList = (kind: 'mine' | 'likes' | 'favorites') => {
-    if (!isLoggedIn()) {
-      Taro.showToast({ title: '请先登录', icon: 'none' })
-      return
-    }
+    if (!requireLogin()) return
     Taro.navigateTo({ url: `/pages/work-list/index?kind=${kind}` })
   }
 
+  const goSignin = () => {
+    if (!requireLogin()) return
+    Taro.navigateTo({ url: '/pages/signin/index' })
+  }
+
+  const goCoins = () => {
+    if (!requireLogin()) return
+    Taro.navigateTo({ url: '/pages/coins/index' })
+  }
+
   const goFeedback = () => {
-    if (!isLoggedIn()) {
-      Taro.showToast({ title: '请先登录', icon: 'none' })
-      return
-    }
+    if (!requireLogin()) return
     Taro.navigateTo({ url: '/pages/feedback/index' })
   }
 
@@ -134,16 +144,17 @@ export default function Mine() {
               <Text className='edit-icon'>✎</Text>
             </View>
           )}
-          <View className='coins-row'>
+          <View className='coins-row' onClick={goCoins}>
             <Text className='coins-icon'>🪙</Text>
             <Text className='coins-value'>{user.coins}</Text>
             <Text className='coins-label'>金币</Text>
+            <Text className='coins-arrow'>›</Text>
           </View>
         </View>
       </View>
 
       <View className='menu-section'>
-        <View className='menu-item' onClick={showComingSoon}>
+        <View className='menu-item' onClick={goSignin}>
           <Text className='menu-icon'>📅</Text>
           <Text className='menu-text'>每日签到</Text>
           <Text className='menu-arrow'>›</Text>

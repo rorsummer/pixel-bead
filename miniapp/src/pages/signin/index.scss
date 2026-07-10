@@ -1,0 +1,159 @@
+.page {
+  min-height: 100vh;
+  background: #f5f5f7;
+  padding-bottom: 60rpx;
+}
+
+.loading {
+  padding: 200rpx 0;
+  text-align: center;
+  color: #999;
+}
+
+.top-block {
+  background: linear-gradient(135deg, #ff9800, #ff5722);
+  padding: 60rpx 32rpx 40rpx;
+  text-align: center;
+  color: white;
+}
+
+.current-coins {
+  display: block;
+  font-size: 72rpx;
+  font-weight: bold;
+}
+
+.coins-label {
+  display: block;
+  font-size: 24rpx;
+  opacity: 0.9;
+  margin-top: 8rpx;
+}
+
+.streak-badge {
+  display: inline-block;
+  margin-top: 24rpx;
+  padding: 12rpx 32rpx;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 40rpx;
+}
+
+.streak-num {
+  font-size: 36rpx;
+  font-weight: bold;
+  margin-right: 8rpx;
+}
+
+.streak-label {
+  font-size: 24rpx;
+}
+
+.calendar-block {
+  background: white;
+  margin: 20rpx;
+  padding: 24rpx;
+  border-radius: 16rpx;
+}
+
+.block-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 20rpx;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12rpx;
+}
+
+.calendar-cell {
+  padding: 20rpx 8rpx;
+  border-radius: 12rpx;
+  background: #f5f5f7;
+  text-align: center;
+  position: relative;
+}
+
+.calendar-cell.today {
+  background: #fff3e0;
+  border: 2rpx solid #ff9800;
+}
+
+.calendar-cell.done {
+  background: #e8f5e9;
+  border: 2rpx solid #4caf50;
+}
+
+.calendar-day {
+  display: block;
+  font-size: 22rpx;
+  color: #666;
+}
+
+.calendar-reward {
+  display: block;
+  font-size: 24rpx;
+  color: #ff9800;
+  font-weight: bold;
+  margin-top: 4rpx;
+}
+
+.calendar-mark {
+  position: absolute;
+  top: 4rpx;
+  right: 8rpx;
+  font-size: 22rpx;
+  color: #4caf50;
+  font-weight: bold;
+}
+
+.calendar-cell.today .calendar-mark {
+  color: #ff9800;
+}
+
+.action-block {
+  padding: 20rpx 32rpx;
+}
+
+.signin-btn {
+  background: linear-gradient(135deg, #ff9800, #ff5722);
+  color: white;
+  font-size: 32rpx;
+  font-weight: bold;
+  border-radius: 40rpx;
+  padding: 20rpx 0;
+}
+
+.signin-btn.done {
+  background: #ccc !important;
+}
+
+.signin-btn[disabled] {
+  background: #ccc !important;
+  color: white !important;
+}
+
+.tips-block {
+  margin: 20rpx;
+  padding: 24rpx;
+  background: white;
+  border-radius: 16rpx;
+}
+
+.tips-title {
+  display: block;
+  font-size: 26rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 12rpx;
+}
+
+.tips-line {
+  display: block;
+  font-size: 24rpx;
+  color: #666;
+  line-height: 1.8;
+}

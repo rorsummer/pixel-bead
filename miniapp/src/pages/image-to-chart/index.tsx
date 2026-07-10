@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { View, Text, Image, Button, Slider, Switch, ScrollView } from '@tarojs/components'
-import Taro from '@tarojs/taro'
+import Taro, { useDidShow } from '@tarojs/taro'
 import { publishWork } from '../../services/works'
-import { isLoggedIn } from '../../services/store'
+import { getToken, isLoggedIn, updateUser, getUser } from '../../services/store'
+import { getPixelateQuota, PixelateQuota } from '../../services/quota'
 import './index.scss'
 
 const API_BASE = 'https://pixel-bead-api.onrender.com'
@@ -22,6 +23,13 @@ interface PixelateResult {
   grid_data: (string | null)[][]
   preview_png_base64: string
   chart_png_base64: string
+  consumption?: {
+    paid: boolean
+    amount: number
+    used_today: number
+    remaining_free: number
+    coins: number
+  }
 }
 
 export default function ImageToChart() {
@@ -35,8 +43,41 @@ export default function ImageToChart() {
   const [loadingText, setLoadingText] = useState('处理中...')
   const [result, setResult] = useState<PixelateResult | null>(null)
   const [tab, setTab] = useState<'preview' | 'chart' | 'stats'>('preview')
+  const [quota, setQuota] = useState<PixelateQuota | null>(null)
+
+  useDidShow(() => {
+    if (isLoggedIn()) {
+      loadQuota()
+    } else {
+      setQuota(null)
+    }
+  })
+
+  const loadQuota = async () => {
+    try {
+      const q = await getPixelateQuota()
+      setQuota(q)
+    } catch (e) {
+      // 忽略配额加载错误
+    }
+  }
+
+  const goLogin = () => {
+    Taro.showModal({
+      title: '需要登录',
+      content: '使用图片转图纸功能前请先登录',
+      confirmText: '去登录',
+      success: (r) => {
+        if (r.confirm) Taro.switchTab({ url: '/pages/mine/index' })
+      },
+    })
+  }
 
   const chooseImage = async () => {
+    if (!isLoggedIn()) {
+      goLogin()
+      return
+    }
     try {
       const res = await Taro.chooseMedia({
         count: 1,
@@ -56,6 +97,39 @@ export default function ImageToChart() {
       Taro.showToast({ title: '请先选择图片', icon: 'none' })
       return
     }
+    if (!isLoggedIn()) {
+      goLogin()
+      return
+    }
+
+    // 检查配额
+    if (quota && quota.remaining_free === 0) {
+      if (quota.coins < quota.cost_after_free) {
+        Taro.showModal({
+          title: '金币不足',
+          content: `今日免费次数已用完，本次需要 ${quota.cost_after_free} 金币。当前只有 ${quota.coins} 金币，快去每日签到攒金币吧`,
+          confirmText: '去签到',
+          success: (r) => {
+            if (r.confirm) Taro.navigateTo({ url: '/pages/signin/index' })
+          },
+        })
+        return
+      }
+      // 金币够，但要确认是否扣费
+      Taro.showModal({
+        title: '今日免费次数已用完',
+        content: `本次将消耗 ${quota.cost_after_free} 金币（当前 ${quota.coins} 金币）`,
+        confirmText: '继续使用',
+        success: (r) => {
+          if (r.confirm) reallySubmit()
+        },
+      })
+      return
+    }
+    reallySubmit()
+  }
+
+  const reallySubmit = () => {
     setLoading(true)
     setLoadingText('正在处理，请稍候...')
     const timer = setTimeout(() => {
@@ -66,6 +140,9 @@ export default function ImageToChart() {
       url: `${API_BASE}/api/pixelate`,
       filePath: tempFilePath,
       name: 'file',
+      header: {
+        Authorization: `Bearer ${getToken()}`,
+      },
       formData: {
         grid_width: String(gridWidth),
         remove_background: String(removeBackground),
@@ -80,10 +157,37 @@ export default function ImageToChart() {
       timeout: 120000,
       success: (res) => {
         clearTimeout(timer)
+        if (res.statusCode >= 400) {
+          let msg = '处理失败'
+          try {
+            const err = JSON.parse(res.data as string)
+            msg = err.detail || msg
+          } catch {}
+          Taro.showToast({ title: msg, icon: 'none', duration: 3000 })
+          return
+        }
         try {
-          const data: PixelateResult = JSON.parse(res.data)
+          const data: PixelateResult = JSON.parse(res.data as string)
           setResult(data)
           setTab('preview')
+          if (data.consumption) {
+            const me = getUser()
+            if (me) updateUser({ ...me, coins: data.consumption.coins })
+            setQuota((prev) => prev && ({
+              ...prev,
+              used_today: data.consumption!.used_today,
+              remaining_free: data.consumption!.remaining_free,
+              cost_next: data.consumption!.remaining_free > 0 ? 0 : prev.cost_after_free,
+              coins: data.consumption!.coins,
+            }))
+            if (data.consumption.paid) {
+              Taro.showToast({
+                title: `已扣除 ${data.consumption.amount} 金币`,
+                icon: 'none',
+                duration: 2000,
+              })
+            }
+          }
         } catch (e) {
           Taro.showToast({ title: '数据解析失败', icon: 'none' })
         }
@@ -131,14 +235,7 @@ export default function ImageToChart() {
   const handlePublish = () => {
     if (!result) return
     if (!isLoggedIn()) {
-      Taro.showModal({
-        title: '需要登录',
-        content: '发布作品前请先登录',
-        confirmText: '去登录',
-        success: (r) => {
-          if (r.confirm) Taro.switchTab({ url: '/pages/mine/index' })
-        },
-      })
+      goLogin()
       return
     }
 
@@ -177,6 +274,31 @@ export default function ImageToChart() {
 
   return (
     <ScrollView scrollY className='page'>
+      {/* 配额提示条 */}
+      {quota ? (
+        <View className='quota-bar'>
+          <View className='quota-info'>
+            <Text className='quota-text'>
+              今日剩余免费次数 <Text className='quota-highlight'>{quota.remaining_free}</Text>
+              <Text className='quota-sep'>/</Text>
+              <Text>{quota.free_quota}</Text>
+            </Text>
+            <Text className='quota-hint'>
+              {quota.remaining_free > 0
+                ? '免费使用中'
+                : `已用完，继续使用每次 ${quota.cost_after_free} 金币`}
+            </Text>
+          </View>
+          <View className='quota-coins'>
+            <Text>🪙 {quota.coins}</Text>
+          </View>
+        </View>
+      ) : (
+        <View className='quota-bar quota-guest'>
+          <Text>登录后可查看今日剩余免费次数</Text>
+        </View>
+      )}
+
       <View className='section'>
         <View className='section-title'>1. 选择图片</View>
         <View className='upload-area' onClick={chooseImage}>
