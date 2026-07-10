@@ -124,3 +124,18 @@ class DailyTaskProgress(Base):
         UniqueConstraint("user_id", "task_key", "progress_date", name="uq_task_user_key_date"),
     )
 
+    
+class Purchase(Base):
+    """购买记录"""
+    __tablename__ = "purchases"
+    id = Column(Integer, primary_key=True, index=True)
+    buyer_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    seller_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    work_id = Column(Integer, ForeignKey("works.id"), nullable=False, index=True)
+    price = Column(Integer, nullable=False)  # 交易时的价格
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    __table_args__ = (
+        UniqueConstraint("buyer_id", "work_id", name="uq_purchase_buyer_work"),
+    )
+
+

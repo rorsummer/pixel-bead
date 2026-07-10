@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user, get_current_user_optional
 from app.core.tasks import bump_progress
 from app.database import get_db
-from app.models import Favorite, Like, User, Work
+from app.models import Favorite, Like, Purchase, User, Work
 from app.wechat import check_text_safe
 
 router = APIRouter()
@@ -31,7 +31,7 @@ class PublishWorkRequest(BaseModel):
     grid_data: list[list[Optional[str]]]
     stats: list[StatItem]
     cover_base64: Optional[str] = None
-    price: int = Field(0, ge=0)
+    price: int = Field(0, ge=0, le=9999)
 
 
 def _work_to_dict(
@@ -40,6 +40,8 @@ def _work_to_dict(
     include_data: bool = False,
     my_liked: bool = False,
     my_favorited: bool = False,
+    my_purchased: bool = False,
+    can_view_detail: bool = True,
 ):
     d = {
         "id": w.id,
@@ -58,6 +60,8 @@ def _work_to_dict(
         "created_at": w.created_at.isoformat(),
         "my_liked": my_liked,
         "my_favorited": my_favorited,
+        "my_purchased": my_purchased,
+        "can_view_detail": can_view_detail,
     }
     if author:
         d["author"] = {
@@ -65,7 +69,7 @@ def _work_to_dict(
             "nickname": author.nickname,
             "avatar_url": author.avatar_url,
         }
-    if include_data:
+    if include_data and can_view_detail:
         d["grid_data"] = json.loads(w.grid_data)
         d["stats"] = json.loads(w.stats)
     return d
@@ -92,10 +96,13 @@ async def publish_work(
     if req.grid_data and len(req.grid_data[0]) != req.grid_width:
         raise HTTPException(400, "grid_data 宽度不一致")
 
-    # 内容审核
-    ok, reason = await check_text_safe(req.title, user.openid, scene=1)
+    # 只有绘制作品才能定价上小卖部（防止用户把图片转的直接卖）
+    if req.price > 0 and req.source_type != "draw":
+        raise HTTPException(400, "只有原创绘制的图纸才能上架小卖部")
+
+    ok, _ = await check_text_safe(req.title, user.openid, scene=1)
     if not ok:
-        raise HTTPException(400, f"标题包含不合规内容，请修改")
+        raise HTTPException(400, "标题包含不合规内容，请修改")
 
     total_beads = sum(s.count for s in req.stats)
     color_count = len(req.stats)
@@ -117,9 +124,7 @@ async def publish_work(
     db.commit()
     db.refresh(work)
 
-    # 更新任务进度
     bump_progress(db, user.id, "publish", 1)
-
     return _work_to_dict(work, author=user)
 
 
@@ -193,6 +198,9 @@ def get_work(
     author = db.query(User).filter(User.id == work.user_id).first()
     my_liked = False
     my_favorited = False
+    my_purchased = False
+    is_owner = user and user.id == work.user_id
+
     if user:
         my_liked = (
             db.query(Like)
@@ -206,6 +214,19 @@ def get_work(
             .first()
             is not None
         )
+        if work.price > 0 and not is_owner:
+            my_purchased = (
+                db.query(Purchase)
+                .filter(Purchase.buyer_id == user.id, Purchase.work_id == work.id)
+                .first()
+                is not None
+            )
+
+    # 权限判断：付费作品，非作者、非购买者，看不到 grid_data
+    if work.price > 0:
+        can_view_detail = bool(is_owner or my_purchased)
+    else:
+        can_view_detail = True
 
     if not user or user.id != work.user_id:
         work.views_count += 1
@@ -218,6 +239,8 @@ def get_work(
         include_data=True,
         my_liked=my_liked,
         my_favorited=my_favorited,
+        my_purchased=my_purchased,
+        can_view_detail=can_view_detail,
     )
 
 

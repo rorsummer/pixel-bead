@@ -12,6 +12,7 @@ from app.api.feedback import router as feedback_router
 from app.api.interactions import router as interactions_router
 from app.api.pixelate import router as pixelate_router
 from app.api.ranking import router as ranking_router
+from app.api.shop import router as shop_router
 from app.api.signin import router as signin_router
 from app.api.tasks import router as tasks_router
 from app.api.user import router as user_router
@@ -23,7 +24,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="创豆纪 API",
     description="拼豆图纸生成器后端",
-    version="0.8.0",
+    version="0.9.0",
 )
 
 app.add_middleware(
@@ -44,6 +45,7 @@ app.include_router(feedback_router, prefix="/api/feedback", tags=["feedback"])
 app.include_router(signin_router, prefix="/api/signin", tags=["signin"])
 app.include_router(coins_router, prefix="/api/coins", tags=["coins"])
 app.include_router(tasks_router, prefix="/api/tasks", tags=["tasks"])
+app.include_router(shop_router, prefix="/api", tags=["shop"])
 
 
 @app.get("/")

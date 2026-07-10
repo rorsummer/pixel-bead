@@ -85,6 +85,11 @@ export default function Mine() {
     Taro.navigateTo({ url: '/pages/signin/index' })
   }
 
+  const goTasks = () => {
+    if (!requireLogin()) return
+    Taro.navigateTo({ url: '/pages/tasks/index' })
+  }
+
   const goCoins = () => {
     if (!requireLogin()) return
     Taro.navigateTo({ url: '/pages/coins/index' })
@@ -93,10 +98,6 @@ export default function Mine() {
   const goFeedback = () => {
     if (!requireLogin()) return
     Taro.navigateTo({ url: '/pages/feedback/index' })
-  }
-
-  const showComingSoon = () => {
-    Taro.showToast({ title: '功能开发中', icon: 'none' })
   }
 
   if (!user) {
@@ -159,7 +160,7 @@ export default function Mine() {
           <Text className='menu-text'>每日签到</Text>
           <Text className='menu-arrow'>›</Text>
         </View>
-        <View className='menu-item' onClick={showComingSoon}>
+        <View className='menu-item' onClick={goTasks}>
           <Text className='menu-icon'>🎯</Text>
           <Text className='menu-text'>每日任务</Text>
           <Text className='menu-arrow'>›</Text>

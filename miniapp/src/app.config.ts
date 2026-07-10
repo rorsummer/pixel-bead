@@ -12,6 +12,7 @@ export default defineAppConfig({
     'pages/feedback/index',
     'pages/signin/index',
     'pages/coins/index',
+    'pages/tasks/index',
   ],
   window: {
     backgroundTextStyle: 'light',
