@@ -9,6 +9,7 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user, get_current_user_optional
+from app.core.tasks import bump_progress
 from app.database import get_db
 from app.models import Favorite, Like, User, Work
 from app.wechat import check_text_safe
@@ -115,6 +116,10 @@ async def publish_work(
     db.add(work)
     db.commit()
     db.refresh(work)
+
+    # 更新任务进度
+    bump_progress(db, user.id, "publish", 1)
+
     return _work_to_dict(work, author=user)
 
 

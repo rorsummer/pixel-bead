@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
+from app.core.tasks import bump_progress
 from app.database import get_db
 from app.models import Favorite, Like, User, Work
 
@@ -57,6 +58,9 @@ def like_work(
         db.add(like)
         work.likes_count += 1
         db.commit()
+        # 更新点赞任务进度（点自己作品不算）
+        if work.user_id != user.id:
+            bump_progress(db, user.id, "like", 1)
     except IntegrityError:
         db.rollback()
     db.refresh(work)
@@ -94,6 +98,8 @@ def favorite_work(
         db.add(fav)
         work.favorites_count += 1
         db.commit()
+        if work.user_id != user.id:
+            bump_progress(db, user.id, "favorite", 1)
     except IntegrityError:
         db.rollback()
     db.refresh(work)
@@ -123,7 +129,6 @@ def my_likes(
     limit: int = Query(20, ge=1, le=50),
     db: Session = Depends(get_db),
 ):
-    """我点赞过的作品列表"""
     q = (
         db.query(Work, Like.created_at.label("liked_at"))
         .join(Like, Like.work_id == Work.id)
@@ -146,7 +151,6 @@ def my_favorites(
     limit: int = Query(20, ge=1, le=50),
     db: Session = Depends(get_db),
 ):
-    """我收藏的作品列表"""
     q = (
         db.query(Work, Favorite.created_at.label("fav_at"))
         .join(Favorite, Favorite.work_id == Work.id)

@@ -108,3 +108,19 @@ class DailyUsage(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "action", "usage_date", name="uq_usage_user_action_date"),
     )
+
+    
+class DailyTaskProgress(Base):
+    """每日任务进度：一个用户一天一个 task_key 一行"""
+    __tablename__ = "daily_task_progress"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    task_key = Column(String(32), nullable=False)  # publish / like / favorite
+    progress_date = Column(Date, nullable=False, index=True)
+    progress = Column(Integer, default=0, nullable=False)
+    claimed = Column(Boolean, default=False, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    __table_args__ = (
+        UniqueConstraint("user_id", "task_key", "progress_date", name="uq_task_user_key_date"),
+    )
+
